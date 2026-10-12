@@ -85,10 +85,9 @@ Your primary goal is to assist customers with information about photo packages, 
 
 def init_chat():
     return st.session_state.genai_client.chats.create(
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
         config={
-            "system_instruction": system_instruction,
-            "temperature": 0.7
+            "system_instruction": system_instruction
         }
     )
 
