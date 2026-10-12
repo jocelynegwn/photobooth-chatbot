@@ -1,41 +1,34 @@
-
 import streamlit as st
 from google import genai
 
+# Mengambil API key secara aman dari Streamlit Secrets
 try:
     google_api_key = st.secrets["GEMINI"]
 except Exception:
     google_api_key = None
 
 if not google_api_key:
-    st.error("API Key kosong!")
+    st.error("API Key belum disetel di Streamlit Secrets!")
     st.stop()
 
-st.session_state.genai_client = genai.Client(api_key=google_api_key)
-
-# CSS STYLING: Background studio foto hangat
+# --- CSS STYLING: BACKGROUND STUDIO DENGAN CAHAYA BULAT PUTIH DI TENGAH ---
 st.markdown("""
 <style>
-    /* Mengubah seluruh halaman menjadi latar studio foto warna kuning hangat dengan efek cahaya sorot putih lembut di tengah */
     .stApp {
         background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.28) 0%, rgba(230, 202, 135, 0.8) 45%, #b89342 100%),
                     radial-gradient(circle at 50% 30%, #e6ca87 0%, #d4b265 60%, #b89342 100%) !important;
         background-attachment: fixed !important;
         color: #2b2b2b !important;
     }
-    
     h1 {
         color: #2b2b2b !important;
         text-shadow: 0 2px 8px rgba(255, 255, 255, 0.3);
         font-weight: 700;
     }
-    
     p, .stCaption {
         color: #3f3a2a !important;
         font-weight: 500;
     }
-    
-    /* Styling bubble chat agar menyatu estetik dengan tema studio */
     .stChatMessage {
         background-color: rgba(255, 253, 245, 0.9) !important;
         border: 1px solid rgba(184, 147, 66, 0.3) !important;
@@ -43,8 +36,6 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
         color: #2b2b2b !important;
     }
-    
-    /* Styling kotak input chat di bagian bawah */
     .stChatInputContainer {
         padding-bottom: 20px;
     }
@@ -57,7 +48,6 @@ st.caption("Asisten virtual interaktif untuk informasi paket foto, rekomendasi k
 if "genai_client" not in st.session_state:
     st.session_state.genai_client = genai.Client(api_key=google_api_key)
 
-# System Instruction 
 system_instruction = """
 You are a helpful and friendly digital assistant for a Photobooth & Self-Photo Studio. 
 Your primary goal is to assist customers with information about photo packages, pricing, studio facilities, staff, and bookings based on the data below.
@@ -93,13 +83,17 @@ Your primary goal is to assist customers with information about photo packages, 
 4. Jika pelanggan ingin melakukan booking, sesi foto, atau pertanyaan lanjutan, arahkan mereka ke Admin WhatsApp kami di **0812-3456-7890** atau kunjungi studio di Jl. Studio Foto No. 8.
 """
 
-if "chat" not in st.session_state:
-    st.session_state.chat = st.session_state.genai_client.chats.create(
-        model="gemini-3.8-flash",
+def init_chat():
+    return st.session_state.genai_client.chats.create(
+        model="gemini-2.5-flash",
         config={
-            "system_instruction": system_instruction
+            "system_instruction": system_instruction,
+            "temperature": 0.7
         }
     )
+
+if "chat" not in st.session_state:
+    st.session_state.chat = init_chat()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -110,7 +104,14 @@ def handle_preset_click(preset_prompt):
         response = st.session_state.chat.send_message(preset_prompt)
         answer = response.text if hasattr(response, "text") else str(response)
     except Exception as e:
-        answer = f"Terjadi error: {e}"
+        # Jika client tertutup atau error 503, buat ulang chat session secara otomatis
+        st.session_state.chat = init_chat()
+        try:
+            response = st.session_state.chat.send_message(preset_prompt)
+            answer = response.text if hasattr(response, "text") else str(response)
+        except Exception as err:
+            answer = f"Maaf, server sedang sibuk (503 / Closed). Silakan coba beberapa saat lagi. (Detail: {err})"
+            
     st.session_state.messages.append({"role": "assistant", "content": answer})
 
 # --- TAMPILAN RIWAYAT & 4 TOMBOL INTERAKTIF ---
@@ -139,7 +140,7 @@ for idx, msg in enumerate(st.session_state.messages):
                     handle_preset_click("Berikan saya beberapa ide pose foto yang keren dan natural untuk sesi photobooth.")
                     st.rerun()
 
-prompt = st.chat_input("Ketik pertanyaan atau minta rekomendasi paket foto di sini...")
+prompt = st.chat_input("Ketik pertanyaan atau minta rekomendasi tema foto di sini...")
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -151,7 +152,13 @@ if prompt:
         response = st.session_state.chat.send_message(prompt)
         answer = response.text if hasattr(response, "text") else str(response)
     except Exception as e:
-        answer = f"Terjadi error: {e}"
+        # Reset ulang chat session jika terjadi error 503 atau client closed
+        st.session_state.chat = init_chat()
+        try:
+            response = st.session_state.chat.send_message(prompt)
+            answer = response.text if hasattr(response, "text") else str(response)
+        except Exception as err:
+            answer = f"Maaf, server sedang sibuk (503 / Closed). Silakan coba beberapa saat lagi. (Detail: {err})"
 
     with st.chat_message("assistant"):
         st.markdown(answer)
