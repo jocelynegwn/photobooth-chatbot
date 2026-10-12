@@ -11,7 +11,7 @@ if not google_api_key:
     st.error("API Key belum disetel di Streamlit Secrets!")
     st.stop()
 
-# --- CSS STYLING: BACKGROUND STUDIO DENGAN CAHAYA BULAT PUTIH DI TENGAH ---
+# CSS: background
 st.markdown("""
 <style>
     .stApp {
